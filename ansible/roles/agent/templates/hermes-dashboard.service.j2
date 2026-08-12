@@ -10,7 +10,7 @@ WorkingDirectory=/home/hermes
 Environment="HOME=/home/hermes"
 Environment="USER=hermes"
 Environment="PATH=/home/hermes/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/home/hermes/.local/bin/hermes dashboard --host 127.0.0.1 --insecure
+ExecStart=/home/hermes/.local/bin/hermes dashboard --host 0.0.0.0 --insecure
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

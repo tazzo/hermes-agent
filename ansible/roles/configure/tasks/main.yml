@@ -11,6 +11,23 @@
     group: hermes
     mode: '0700'
 
+# Compute scrypt hash for dashboard basic_auth (only needed if config absent).
+# EXACT format of plugins/dashboard_auth/basic.hash_password:
+#   scrypt$16384$8$1$<b64(salt)>$<b64(dk)> — STANDARD base64 WITH padding,
+#   maxmem=0. (urlsafe/no-padding variants fail verification — verified 2026-08-12.)
+- name: Compute dashboard password hash (scrypt, exact hermes format)
+  command: python3 -c "
+    import hashlib, base64, os, sys
+    pw = {{ lookup('env', 'DASHBOARD_PASSWORD') | to_json }}
+    salt = os.urandom(16)
+    dk = hashlib.scrypt(pw.encode(), salt=salt, n=16384, r=8, p=1, dklen=32, maxmem=0)
+    print('scrypt$16384$8$1$' + base64.b64encode(salt).decode() + '$' + base64.b64encode(dk).decode())
+  "
+  register: dash_hash
+  changed_when: false
+  when: lookup('env', 'DASHBOARD_PASSWORD') | length > 0
+  no_log: true
+
 - name: Deploy config.yaml (only if absent — user config wins on rebuilds)
   template:
     src: config.yaml.j2
@@ -19,6 +36,8 @@
     group: hermes
     mode: '0644'
     force: no
+  vars:
+    dashboard_password_hash: "{{ dash_hash.stdout if dash_hash.stdout is defined else '' }}"
 
 - name: Deploy SOUL.md (only if absent)
   template:

@@ -2,6 +2,11 @@
 # LLM provider is configured by the USER via the dashboard (port 9119) at first access.
 terminal:
   backend: local
+dashboard:
+  # Basic auth required for non-loopback bind (Hermes refuses 0.0.0.0 without it)
+  basic_auth:
+    username: hermes
+    password_hash: "{{ dashboard_password_hash }}"
 updates:
   pre_update_backup: quick
   backup_keep: 5

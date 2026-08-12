@@ -41,7 +41,7 @@ PROXMOX_HOST="${PROXMOX_HOST:-192.168.1.200}"
 
 # gopass pre-flight: verificare che i secret siano leggibili
 # (github token NON serve al create — solo al push del repo)
-for secret in bootstrap/proxmox/token-id bootstrap/proxmox/token-secret infra/ssh-host-keys/hermes-agent/ed25519 infra/hermes-vm/bootstrap-password infra/hermes-vm/hermes-password; do
+for secret in bootstrap/proxmox/token-id bootstrap/proxmox/token-secret infra/ssh-host-keys/hermes-agent/ed25519 infra/hermes-vm/bootstrap-password infra/hermes-vm/hermes-password infra/hermes-vm/dashboard-password; do
   if ! gopass show -o "$secret" >/dev/null 2>&1; then
     err "gopass locked or missing: $secret — run 'gopass show $secret' once to warm the cache"
     exit 1
@@ -52,6 +52,7 @@ info "gopass secrets: all readable"
 # Export env vars for Ansible (never written to disk)
 export BOOTSTRAP_PASSWORD="$(gopass show -o infra/hermes-vm/bootstrap-password | tr -d '\r')"
 export HERMES_PASSWORD="$(gopass show -o infra/hermes-vm/hermes-password | tr -d '\r')"
+export DASHBOARD_PASSWORD="$(gopass show -o infra/hermes-vm/dashboard-password | tr -d '\r')"
 export HERMES_HOST_KEY="$(gopass cat infra/ssh-host-keys/hermes-agent/ed25519 2>/dev/null)"  # cat: multi-line key
 export PROXMOX_VE_API_TOKEN="$(gopass show -o bootstrap/proxmox/token-id | tr -d "'\r")=$(gopass show -o bootstrap/proxmox/token-secret | tr -d "'\r")"
 export PROXMOX_VE_INSECURE=true

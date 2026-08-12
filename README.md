@@ -36,6 +36,7 @@ Proxmox "tazlab" (192.168.1.200)
 ```
 
 - **First run**: creates VM, installs Hermes, dashboard on `http://192.168.1.205:9119`. Configure the LLM provider from the dashboard (first-access onboarding).
+- **Dashboard credentials**: username `hermes`, password from `gopass show -o infra/hermes-vm/dashboard-password` (basic auth, required for non-loopback bind)
 - **Subsequent runs after destroy**: data disk already populated → install skipped → services start with previous config. Zero re-onboarding (option A).
 - Idempotent: re-running `create.sh` on a live VM is a no-op (terraform plan empty, Ansible unchanged).
 
