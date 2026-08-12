@@ -40,7 +40,8 @@ source "$SCRIPT_DIR/configs/runtime.env"
 PROXMOX_HOST="${PROXMOX_HOST:-192.168.1.200}"
 
 # gopass pre-flight: verificare che i secret siano leggibili
-for secret in bootstrap/proxmox/token-id bootstrap/proxmox/token-secret cluster/github/token infra/ssh-host-keys/hermes-agent/ed25519 infra/hermes-vm/bootstrap-password infra/hermes-vm/hermes-password; do
+# (github token NON serve al create — solo al push del repo)
+for secret in bootstrap/proxmox/token-id bootstrap/proxmox/token-secret infra/ssh-host-keys/hermes-agent/ed25519 infra/hermes-vm/bootstrap-password infra/hermes-vm/hermes-password; do
   if ! gopass show -o "$secret" >/dev/null 2>&1; then
     err "gopass locked or missing: $secret — run 'gopass show $secret' once to warm the cache"
     exit 1
@@ -74,8 +75,10 @@ CURRENT_PHASE="phase1-preflight"
 info "Phase 1/8 — pre-flight"
 cd "$SCRIPT_DIR/terraform"
 
-# Data disk: create only if missing (canonical vm-<VMID>-disk-<N> name)
-if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "root@$PROXMOX_HOST" "pvesm list $STORAGE_POOL --vmid $VM_ID 2>/dev/null | grep -q '$VOLID'" 2>/dev/null; then
+# Data disk: create only if missing (canonical vm-<VMID>-disk-<N> name).
+# lvs check (not pvesm --vmid): after destroy.sh the volume is orphaned
+# (removed from VM config) — pvesm --vmid filter may miss it.
+if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "root@$PROXMOX_HOST" "lvs | grep -q 'vm-${VM_ID}-disk-2'" 2>/dev/null; then
   info "Phase 1/8 — data disk $VOLID: exists"
 else
   info "Phase 1/8 — data disk $VOLID: not found, creating..."
