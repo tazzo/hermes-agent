@@ -18,12 +18,14 @@
 - name: Compute dashboard password hash (scrypt, exact hermes format)
   vars:
     dash_hash_script: |
-      import hashlib, base64, os, sys
-      pw = {{ lookup('env', 'DASHBOARD_PASSWORD') | to_json }}
+      import hashlib, base64, os
+      pw = os.environ['DASHBOARD_PASSWORD']
       salt = os.urandom(16)
       dk = hashlib.scrypt(pw.encode(), salt=salt, n=16384, r=8, p=1, dklen=32, maxmem=0)
       print('scrypt$16384$8$1$' + base64.b64encode(salt).decode() + '$' + base64.b64encode(dk).decode())
   command: python3 -c "{{ dash_hash_script }}"
+  environment:
+    DASHBOARD_PASSWORD: "{{ lookup('env', 'DASHBOARD_PASSWORD') }}"
   register: dash_hash
   changed_when: false
   when: lookup('env', 'DASHBOARD_PASSWORD') | length > 0
