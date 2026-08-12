@@ -59,12 +59,19 @@ ssh $SSH_OPTS "root@$PROXMOX_HOST" "qm unlink $VM_ID --idlist virtio1" 2>&1 | te
 info "Phase 2/4 — verify detach state (data disk is now unusedN)"
 ssh $SSH_OPTS "root@$PROXMOX_HOST" "qm config $VM_ID | grep -E 'unused' | tee -a /dev/null" 2>&1 | tee -a "$LOG_FILE" || true
 
-# ── PHASE 3: Destroy VM with explicit disk preservation ────────────────────
+# ── PHASE 3: Destroy VM — data disk renamed out of vm-<VMID>-* convention ──
 CURRENT_PHASE="phase3-destroy-vm"
-info "Phase 3/4 — qm destroy with --destroy-unreferenced-disks 0 (data disk PRESERVED)"
-# NOT terraform destroy: the provider's destroy call may delete unused disks
-# regardless of delete_unreferenced_disks_on_destroy. The native CLI flag is
-# explicit and version-verified (PVE 9.1).
+info "Phase 3/4 — stop VM, rename data disk out of vm-* convention, destroy"
+# Graceful shutdown via guest agent first; force-stop fallback (10s timeout).
+ssh $SSH_OPTS "root@$PROXMOX_HOST" "qm shutdown $VM_ID --timeout 60" 2>&1 | tee -a "$LOG_FILE" || true
+sleep 3
+ssh $SSH_OPTS "root@$PROXMOX_HOST" "if qm status $VM_ID | grep -q running; then echo 'still running, force stop'; qm stop $VM_ID; fi" 2>&1 | tee -a "$LOG_FILE"
+# CRITICAL (verified by destructive tests 2026-08-12): `qm destroy` deletes ALL
+# volumes matching the vm-<VMID>-* naming convention — even unused*, even with
+# --destroy-unreferenced-disks 0. The only robust protection: lvrename the
+# data volume OUT of the convention before destroy, rename BACK on next create.
+ORPHAN_LV="vm-${VM_ID}-data-orphan"
+ssh $SSH_OPTS "root@$PROXMOX_HOST" "lvrename pve/vm-${VM_ID}-disk-2 pve/$ORPHAN_LV && echo 'data volume renamed to $ORPHAN_LV (safe from qm destroy)'" 2>&1 | tee -a "$LOG_FILE"
 ssh $SSH_OPTS "root@$PROXMOX_HOST" "qm destroy $VM_ID --destroy-unreferenced-disks 0" 2>&1 | tee -a "$LOG_FILE"
 info "Phase 3/4 — VM destroyed"
 
@@ -79,7 +86,7 @@ terraform state rm proxmox_virtual_environment_vm.hermes 2>&1 | tail -1 | tee -a
 # ── PHASE 4: Final verify ──────────────────────────────────────────────────
 CURRENT_PHASE="phase4-verify"
 info "Phase 4/4 — verify data disk still present"
-ssh $SSH_OPTS "root@$PROXMOX_HOST" "lvs | grep -q 'vm-${VM_ID}-disk-2' && echo 'DATA DISK PRESERVED: $VOLID' || echo 'WARN: data disk NOT found!'" 2>&1 | tee -a "$LOG_FILE"
+ssh $SSH_OPTS "root@$PROXMOX_HOST" "lvs | grep -q 'vm-${VM_ID}-data-orphan' && echo 'DATA DISK PRESERVED: $VOLID (as vm-${VM_ID}-data-orphan)' || echo 'WARN: data disk NOT found!'" 2>&1 | tee -a "$LOG_FILE"
 
 info "destroy.sh COMPLETE — VM destroyed, data disk $VOLID preserved in $STORAGE_POOL"
 info "Re-create with: ./create.sh"

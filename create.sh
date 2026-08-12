@@ -76,9 +76,14 @@ info "Phase 1/8 — pre-flight"
 cd "$SCRIPT_DIR/terraform"
 
 # Data disk: create only if missing (canonical vm-<VMID>-disk-<N> name).
-# lvs check (not pvesm --vmid): after destroy.sh the volume is orphaned
-# (removed from VM config) — pvesm --vmid filter may miss it.
-if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "root@$PROXMOX_HOST" "lvs | grep -q 'vm-${VM_ID}-disk-2'" 2>/dev/null; then
+# lvs check (not pvesm --vmid): after destroy.sh the volume is renamed to
+# vm-<VMID>-data-orphan (outside the vm-* convention so qm destroy skips it).
+ORPHAN_LV="vm-${VM_ID}-data-orphan"
+if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "root@$PROXMOX_HOST" "lvs | grep -q '$ORPHAN_LV'" 2>/dev/null; then
+  info "Phase 1/8 — data disk found as $ORPHAN_LV (survived destroy), renaming back..."
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "root@$PROXMOX_HOST" "lvrename pve/$ORPHAN_LV pve/vm-${VM_ID}-disk-2" | tee -a "$LOG_FILE"
+  info "Phase 1/8 — renamed back to vm-${VM_ID}-disk-2"
+elif ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "root@$PROXMOX_HOST" "lvs | grep -q 'vm-${VM_ID}-disk-2'" 2>/dev/null; then
   info "Phase 1/8 — data disk $VOLID: exists"
 else
   info "Phase 1/8 — data disk $VOLID: not found, creating..."
