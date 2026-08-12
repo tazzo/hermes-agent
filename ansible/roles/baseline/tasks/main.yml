@@ -4,6 +4,18 @@
 # Passwords injected via env vars (BOOTSTRAP_PASSWORD, HERMES_PASSWORD)
 # exported by create.sh from gopass — never stored in files or logs.
 
+- name: Wait for dpkg/apt lock to be free (cloud-init/unattended-upgrades may hold it at first boot)
+  shell: |
+    for i in $(seq 1 60); do
+      if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+        exit 0
+      fi
+      sleep 2
+    done
+    echo "dpkg lock still held after 120s" >&2
+    exit 1
+  changed_when: false
+
 - name: apt update
   apt:
     update_cache: yes

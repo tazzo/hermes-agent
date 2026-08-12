@@ -4,6 +4,13 @@ resource "proxmox_download_file" "ubuntu_cloud_image" {
   node_name    = var.node_name
   url          = var.cloud_image_url
   file_name    = var.cloud_image_filename
+
+  # The cloud image is a reusable asset: download ONCE, never re-download or
+  # destroy. The provider's import doesn't populate `url` in state, which
+  # would otherwise force a replacement (and a 403 delete on 'local').
+  lifecycle {
+    ignore_changes = [url, overwrite, overwrite_unmanaged, upload_timeout, verify]
+  }
 }
 
 resource "proxmox_virtual_environment_vm" "hermes" {

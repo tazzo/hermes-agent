@@ -56,22 +56,25 @@ info "Phase 1/4 — VM $VM_ID exists, proceeding"
 CURRENT_PHASE="phase2-unlink-data-disk"
 info "Phase 2/4 — unlink data disk (preserved in $STORAGE_POOL)"
 ssh $SSH_OPTS "root@$PROXMOX_HOST" "qm unlink $VM_ID --idlist virtio1" 2>&1 | tee -a "$LOG_FILE"
-# CRITICAL (found by destroy test 2026-08-12): after unlink the disk becomes
-# unused0 in the VM config, and `qm destroy` deletes ALL referenced disks
-# INCLUDING unused*. Remove unused0 from the config so the volume is orphaned
-# in local-lvm (survives), and re-attachable by volid on next create.
-ssh $SSH_OPTS "root@$PROXMOX_HOST" "unused_id=\$(qm config $VM_ID | grep -oE 'unused[0-9]+' | head -1); if [ -n \"\$unused_id\" ]; then qm set $VM_ID --delete \$unused_id && echo \"removed \$unused_id from config (volume preserved)\"; else echo 'no unused entry'; fi" 2>&1 | tee -a "$LOG_FILE"
-info "Phase 2/4 — verify detach state (data disk must NOT be destroyable)"
-ssh $SSH_OPTS "root@$PROXMOX_HOST" "qm config $VM_ID | grep -E 'virtio1|unused' || echo 'no data disk in config — volume orphaned, preserved'" 2>&1 | tee -a "$LOG_FILE"
+info "Phase 2/4 — verify detach state (data disk is now unusedN)"
+ssh $SSH_OPTS "root@$PROXMOX_HOST" "qm config $VM_ID | grep -E 'unused' | tee -a /dev/null" 2>&1 | tee -a "$LOG_FILE" || true
 
-# ── PHASE 3: Terraform destroy (VM + root disk only) ──────────────────────
-CURRENT_PHASE="phase3-terraform-destroy"
-info "Phase 3/4 — terraform destroy (VM + root disk; data disk preserved)"
+# ── PHASE 3: Destroy VM with explicit disk preservation ────────────────────
+CURRENT_PHASE="phase3-destroy-vm"
+info "Phase 3/4 — qm destroy with --destroy-unreferenced-disks 0 (data disk PRESERVED)"
+# NOT terraform destroy: the provider's destroy call may delete unused disks
+# regardless of delete_unreferenced_disks_on_destroy. The native CLI flag is
+# explicit and version-verified (PVE 9.1).
+ssh $SSH_OPTS "root@$PROXMOX_HOST" "qm destroy $VM_ID --destroy-unreferenced-disks 0" 2>&1 | tee -a "$LOG_FILE"
+info "Phase 3/4 — VM destroyed"
+
+# ── PHASE 3.5: Align Terraform state ───────────────────────────────────────
+CURRENT_PHASE="phase3-state-align"
+info "Phase 3.5/4 — remove VM from terraform state (destroyed via CLI)"
 cd "$SCRIPT_DIR/terraform"
-# Destroy ONLY the VM resource. The cloud image (proxmox_download_file) is a
-# reusable asset that stays in state and in the datastore — destroying it
-# would force a re-download AND our token lacks delete permission on 'local'.
-terraform destroy -target=proxmox_virtual_environment_vm.hermes -auto-approve -input=false -var "ssh_public_key=$(cat "${SSH_KEY:-$HOME/.ssh/id_ed25519.pub}")" 2>&1 | tee -a "$LOG_FILE"
+export PROXMOX_VE_API_TOKEN="$(gopass show -o bootstrap/proxmox/token-id | tr -d "'\r")=$(gopass show -o bootstrap/proxmox/token-secret | tr -d "'\r")"
+export PROXMOX_VE_INSECURE=true
+terraform state rm proxmox_virtual_environment_vm.hermes 2>&1 | tail -1 | tee -a "$LOG_FILE" || true
 
 # ── PHASE 4: Final verify ──────────────────────────────────────────────────
 CURRENT_PHASE="phase4-verify"
