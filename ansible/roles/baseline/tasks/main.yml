@@ -61,6 +61,8 @@
       - fonts-tlwg-loma-otf
       - fonts-freefont-ttf
       - e2fsprogs
+      - libopus0        # Discord voice: Opus codec (discord.py[voice] requires it)
+      - ffmpeg          # Discord voice: audio transcoding (also available as static user-space binary)
     state: present
     lock_timeout: 600
 
