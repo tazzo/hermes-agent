@@ -57,6 +57,22 @@
     mode: '0600'
     force: no
 
+# GROQ_API_KEY: idempotent provisioning into the EXISTING .env (which is
+# user-managed and never overwritten on rebuilds). The value comes from gopass
+# via env var exported at playbook run (export GROQ_API_KEY=$(gopass show -o <path>)).
+# no_log: the key never lands in Ansible output or logs.
+- name: Ensure GROQ_API_KEY present in .env (IaC provisioning, idempotent)
+  lineinfile:
+    path: /home/hermes/.hermes/.env
+    regexp: '^GROQ_API_KEY='
+    line: "GROQ_API_KEY={{ lookup('env', 'GROQ_API_KEY') }}"
+    create: yes
+    mode: '0600'
+    owner: hermes
+    group: hermes
+  when: lookup('env', 'GROQ_API_KEY') | length > 0
+  no_log: true
+
 # auth.json (OAuth creds from dashboard onboarding) is NEVER touched by Ansible.
 
 - name: Run hermes config check (safe every run)
