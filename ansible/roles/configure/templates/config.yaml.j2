@@ -1,0 +1,8 @@
+# Minimal bootstrap config — Hermes creates/extend this on first run.
+# LLM provider is configured by the USER via the dashboard (port 9119) at first access.
+terminal:
+  backend: local
+updates:
+  pre_update_backup: quick
+  backup_keep: 5
+  non_interactive_local_changes: stash

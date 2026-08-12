@@ -1,0 +1,6 @@
+---
+- name: Hermes Configuration
+  hosts: hermes
+  become: yes
+  roles:
+    - configure

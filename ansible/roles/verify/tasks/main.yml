@@ -1,0 +1,62 @@
+---
+# Verification: services up + dashboard reachable + config check.
+# NO LLM call — provider is configured by the user via dashboard onboarding
+# (post-onboarding LLM validation is a separate manual step).
+
+- name: Wait for Hermes Dashboard to be ready
+  wait_for:
+    port: 9119
+    delay: 5
+    timeout: 60
+    state: started
+
+- name: Check Hermes Gateway process
+  shell: pgrep -f "hermes gateway"
+  register: gateway_pid
+  failed_when: gateway_pid.stdout == ""
+
+- name: Check Hermes Dashboard process
+  shell: pgrep -f "hermes dashboard"
+  register: dashboard_pid
+  failed_when: dashboard_pid.stdout == ""
+
+- name: Check hermes binary version
+  shell: /home/hermes/.local/bin/hermes --version
+  become: yes
+  become_user: hermes
+  become_method: su
+  environment:
+    HOME: /home/hermes
+    USER: hermes
+  register: hermes_version
+  failed_when: hermes_version.rc != 0
+
+- name: Dashboard HTTP reachable on 127.0.0.1:9119
+  uri:
+    url: http://127.0.0.1:9119/
+    status_code: 200
+  register: dashboard_http
+  failed_when: dashboard_http.status != 200
+
+- name: Hermes config check
+  shell: /home/hermes/.local/bin/hermes config check
+  become: yes
+  become_user: hermes
+  become_method: su
+  environment:
+    HOME: /home/hermes
+    USER: hermes
+  register: config_check
+  failed_when: config_check.rc != 0
+
+- name: Verify /home/hermes is on the persistent disk (virtio1)
+  shell: df -h /home/hermes | tail -1
+  register: home_df
+  failed_when: "'/dev/vdb' not in home_df.stdout"
+
+- name: Report versions
+  debug:
+    msg:
+      - "hermes version: {{ hermes_version.stdout }}"
+      - "dashboard: http://127.0.0.1:9119 (status {{ dashboard_http.status }})"
+      - "home mount: {{ home_df.stdout }}"

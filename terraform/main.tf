@@ -6,36 +6,6 @@ resource "proxmox_download_file" "ubuntu_cloud_image" {
   file_name    = var.cloud_image_filename
 }
 
-resource "proxmox_virtual_environment_file" "user_data_cloud_config" {
-  content_type = "snippets"
-  datastore_id = "local"
-  node_name    = var.node_name
-
-  source_raw {
-    data = <<-EOF
-    #cloud-config
-    hostname: ${var.hostname}
-    timezone: Europe/Rome
-    users:
-      - default
-      - name: bootstrap
-        groups:
-          - sudo
-        shell: /bin/bash
-        ssh_authorized_keys:
-          - ${trimspace(var.ssh_public_key)}
-        sudo: ALL=(ALL) NOPASSWD:ALL
-    package_update: true
-    packages:
-      - qemu-guest-agent
-    runcmd:
-      - systemctl enable --now qemu-guest-agent
-    EOF
-
-    file_name = "hermes-user-data-cloud-config.yaml"
-  }
-}
-
 resource "proxmox_virtual_environment_vm" "hermes" {
   name      = var.hostname
   node_name = var.node_name
@@ -53,9 +23,10 @@ resource "proxmox_virtual_environment_vm" "hermes" {
   # (vm-<VMID>-disk-1, attached outside Terraform via qm set) on destroy.
   delete_unreferenced_disks_on_destroy = false
 
-  agent {
-    enabled = true
-  }
+  # NOTE: agent.enabled intentionally NOT set. The provider waits for the
+  # qemu-guest-agent to report IPs after boot; cloud images don't ship it,
+  # which stalls apply for minutes. IP is static via cloud-init; the agent
+  # is installed by Ansible baseline instead.
 
   efi_disk {
     datastore_id = var.storage_pool
@@ -89,7 +60,12 @@ resource "proxmox_virtual_environment_vm" "hermes" {
       }
     }
 
-    user_data_file_id = proxmox_virtual_environment_file.user_data_cloud_config.id
+    # SSH key ONLY in cloud-init. Passwords are set post-boot by Ansible
+    # from gopass env vars — never stored in Terraform state.
+    user_account {
+      username = "bootstrap"
+      keys     = [var.ssh_public_key]
+    }
   }
 
   network_device {

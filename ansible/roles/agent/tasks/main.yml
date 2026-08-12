@@ -1,0 +1,84 @@
+---
+# Hermes Agent install + systemd units + SSH host key injection
+
+- name: Check if Hermes is already installed
+  stat:
+    path: /home/hermes/.local/bin/hermes
+  register: hermes_bin
+
+- name: Download Hermes install script
+  get_url:
+    url: https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh
+    dest: /home/hermes/install.sh
+    mode: '0755'
+  when: not hermes_bin.stat.exists
+
+- name: Execute Hermes install.sh
+  command: /home/hermes/install.sh --skip-setup --dir /home/hermes/.local/share/hermes-agent --hermes-home /home/hermes/.hermes
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+    HOME: /home/hermes
+    USER: hermes
+  args:
+    chdir: /home/hermes
+  when: not hermes_bin.stat.exists
+
+- name: Ensure specific Hermes directories are owned by hermes
+  file:
+    path: "{{ item }}"
+    owner: hermes
+    group: hermes
+    recurse: yes
+  loop:
+    - /home/hermes/.local
+    - /home/hermes/.hermes
+    - /home/hermes/.npm
+
+- name: Ensure install.sh is owned by hermes
+  file:
+    path: /home/hermes/install.sh
+    owner: hermes
+    group: hermes
+
+# ── SSH host key injection (from gopass, post-boot) ─────────────────────
+# Reuse infra/ssh-host-keys/hermes-agent/ed25519 so known_hosts stay valid.
+# Passed via env var HERMES_HOST_KEY from create.sh (gopass), never in files.
+
+- name: Inject persisted host key
+  copy:
+    content: "{{ lookup('env', 'HERMES_HOST_KEY') }}\n"
+    dest: /etc/ssh/ssh_host_ed25519_key
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  when: lookup('env', 'HERMES_HOST_KEY') | length > 0
+
+- name: Regenerate matching public key from injected private key
+  shell: ssh-keygen -y -f /etc/ssh/ssh_host_ed25519_key > /etc/ssh/ssh_host_ed25519_key.pub && chmod 0644 /etc/ssh/ssh_host_ed25519_key.pub
+  when: lookup('env', 'HERMES_HOST_KEY') | length > 0
+
+- name: Restart sshd to apply host key
+  systemd:
+    name: sshd
+    state: restarted
+  when: lookup('env', 'HERMES_HOST_KEY') | length > 0
+
+- name: Deploy hermes-gateway systemd unit
+  template:
+    src: hermes-gateway.service.j2
+    dest: /etc/systemd/system/hermes-gateway.service
+    mode: '0644'
+  become: yes
+
+- name: Deploy hermes-dashboard systemd unit
+  template:
+    src: hermes-dashboard.service.j2
+    dest: /etc/systemd/system/hermes-dashboard.service
+    mode: '0644'
+  become: yes
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+  become: yes

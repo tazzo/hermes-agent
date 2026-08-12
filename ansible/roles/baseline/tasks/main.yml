@@ -1,0 +1,153 @@
+---
+# Baseline: OS patching + users + data disk mount
+# Runs as bootstrap (become: yes). Idempotent.
+# Passwords injected via env vars (BOOTSTRAP_PASSWORD, HERMES_PASSWORD)
+# exported by create.sh from gopass — never stored in files or logs.
+
+- name: apt update
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: apt upgrade — MANDATORY (recent Ubuntu bug wave, patch immediately)
+  apt:
+    upgrade: dist
+    autoremove: yes
+
+- name: Install baseline packages
+  apt:
+    name:
+      - git
+      - curl
+      - python3
+      - python3-pip
+      - qemu-guest-agent
+      - libasound2
+      - libatk-bridge2.0-0
+      - libatk1.0-0
+      - libatspi2.0-0
+      - libcairo2
+      - libcups2
+      - libdbus-1-3
+      - libdrm2
+      - libgbm1
+      - libglib2.0-0
+      - libnspr4
+      - libnss3
+      - libpango-1.0-0
+      - libx11-6
+      - libxcb1
+      - libxcomposite1
+      - libxdamage1
+      - libxext6
+      - libxfixes3
+      - libxkbcommon0
+      - libxrandr2
+      - xvfb
+      - fonts-noto-color-emoji
+      - fonts-unifont
+      - libfontconfig1
+      - libfreetype6
+      - xfonts-scalable
+      - fonts-liberation
+      - fonts-ipafont-gothic
+      - fonts-wqy-zenhei
+      - fonts-tlwg-loma-otf
+      - fonts-freefont-ttf
+      - e2fsprogs
+    state: present
+
+- name: Enable qemu-guest-agent
+  systemd:
+    name: qemu-guest-agent
+    enabled: yes
+    state: started
+
+# ── bootstrap user (admin, passwordless sudo) ───────────────────────────
+# Created by cloud-init with SSH key. Here: password + sudo.
+
+- name: Set bootstrap password (from gopass env, no_log)
+  user:
+    name: bootstrap
+    password: "{{ lookup('env', 'BOOTSTRAP_PASSWORD') | password_hash('sha512') }}"
+    shell: /bin/bash
+  no_log: true
+
+- name: Add bootstrap to sudo group
+  user:
+    name: bootstrap
+    groups: sudo
+    append: yes
+
+- name: Passwordless sudo for bootstrap
+  copy:
+    content: "bootstrap ALL=(ALL) NOPASSWD:ALL\n"
+    dest: /etc/sudoers.d/bootstrap
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s
+
+# ── hermes user (non-root, no sudo) ─────────────────────────────────────
+
+- name: Create hermes user
+  user:
+    name: hermes
+    uid: 10000
+    shell: /bin/bash
+    create_home: no   # home is the mounted data disk
+    state: present
+
+- name: Set hermes password (from gopass env, no_log)
+  user:
+    name: hermes
+    password: "{{ lookup('env', 'HERMES_PASSWORD') | password_hash('sha512') }}"
+  no_log: true
+
+- name: Set up authorized_keys for hermes user
+  ansible.posix.authorized_key:
+    user: hermes
+    state: present
+    key: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+
+# ── Persistent data disk (vm-<VMID>-disk-1) → /home/hermes ─────────────
+# Format ONLY on first boot (no filesystem yet). Mount always (fstab).
+
+- name: Check if data disk /dev/vdb has a filesystem
+  command: blkid -s TYPE -o value /dev/vdb
+  register: vdb_fstype
+  changed_when: false
+  failed_when: false
+
+- name: Format /dev/vdb as ext4 (first boot only)
+  filesystem:
+    fstype: ext4
+    dev: /dev/vdb
+  when: vdb_fstype.stdout == ""
+
+- name: Create /home/hermes mount point
+  file:
+    path: /home/hermes
+    state: directory
+    owner: hermes
+    group: hermes
+    mode: '0755'
+
+- name: Add /dev/vdb to /etc/fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "/dev/vdb /home/hermes ext4 defaults 0 2"
+    create: yes
+
+- name: Mount /home/hermes
+  mount:
+    path: /home/hermes
+    src: /dev/vdb
+    fstype: ext4
+    state: mounted
+
+- name: Ensure /home/hermes owned by hermes
+  file:
+    path: /home/hermes
+    owner: hermes
+    group: hermes
+    mode: '0755'
+    state: directory

@@ -1,0 +1,74 @@
+---
+# Hermes configuration — bootstrap defaults ONLY if missing (per-file force: no)
+# User-managed state (config.yaml, .env, auth.json) is NEVER overwritten on rebuilds
+# (option A: persistent home = ready base).
+
+- name: Ensure .hermes directory exists
+  file:
+    path: /home/hermes/.hermes
+    state: directory
+    owner: hermes
+    group: hermes
+    mode: '0700'
+
+- name: Deploy config.yaml (only if absent — user config wins on rebuilds)
+  template:
+    src: config.yaml.j2
+    dest: /home/hermes/.hermes/config.yaml
+    owner: hermes
+    group: hermes
+    mode: '0644'
+    force: no
+
+- name: Deploy SOUL.md (only if absent)
+  template:
+    src: SOUL.md.j2
+    dest: /home/hermes/.hermes/SOUL.md
+    owner: hermes
+    group: hermes
+    mode: '0644'
+    force: no
+
+- name: Deploy .env (only if absent — user-entered API keys win on rebuilds)
+  template:
+    src: .env.j2
+    dest: /home/hermes/.hermes/.env
+    owner: hermes
+    group: hermes
+    mode: '0600'
+    force: no
+
+# auth.json (OAuth creds from dashboard onboarding) is NEVER touched by Ansible.
+
+- name: Run hermes config check (safe every run)
+  become: yes
+  become_user: hermes
+  become_method: su
+  command: /home/hermes/.local/bin/hermes config check
+  environment:
+    HOME: /home/hermes
+    USER: hermes
+  register: config_check
+  changed_when: false
+  failed_when: false
+
+- name: Ensure all hermes files and directories are owned by hermes user
+  file:
+    path: "{{ item }}"
+    owner: hermes
+    group: hermes
+    recurse: yes
+  loop:
+    - /home/hermes/.hermes
+    - /home/hermes/.local
+    - /home/hermes/.npm
+
+- name: Enable and restart hermes services
+  systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: restarted
+    daemon_reload: yes
+  loop:
+    - hermes-gateway.service
+    - hermes-dashboard.service

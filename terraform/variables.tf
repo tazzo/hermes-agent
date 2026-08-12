@@ -25,7 +25,7 @@ variable "gateway" {
 variable "hostname" {
   description = "VM hostname"
   type        = string
-  default     = "hermes-agent"
+  default     = "hermes"
 }
 
 variable "cores" {

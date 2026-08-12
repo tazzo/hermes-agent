@@ -1,0 +1,6 @@
+---
+- name: Hermes Verification
+  hosts: hermes
+  become: yes
+  roles:
+    - verify

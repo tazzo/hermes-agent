@@ -1,0 +1,6 @@
+---
+- name: Hermes Baseline Configuration
+  hosts: hermes
+  become: yes
+  roles:
+    - baseline
