@@ -32,6 +32,6 @@ resource "local_file" "runtime_env" {
     root_disk_gb   = var.root_disk_gb
     data_disk_gb   = var.data_disk_gb
     storage_pool   = var.storage_pool
-    volid          = "local-lvm:vm-${var.vm_id}-disk-1"
+    volid          = "local-lvm:vm-${var.vm_id}-disk-2"
   })
 }

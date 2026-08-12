@@ -42,7 +42,9 @@
 
 # ── SSH host key injection (from gopass, post-boot) ─────────────────────
 # Reuse infra/ssh-host-keys/hermes-agent/ed25519 so known_hosts stay valid.
-# Passed via env var HERMES_HOST_KEY from create.sh (gopass), never in files.
+# Passed via env var HERMES_HOST_KEY from create.sh.
+# IMPORTANT: create.sh MUST use `gopass cat` (not `show -o`) — show -o
+# returns only the first line for multi-line secrets (411B vs 35B key).
 
 - name: Inject persisted host key
   copy:

@@ -41,10 +41,7 @@
 # auth.json (OAuth creds from dashboard onboarding) is NEVER touched by Ansible.
 
 - name: Run hermes config check (safe every run)
-  become: yes
-  become_user: hermes
-  become_method: su
-  command: /home/hermes/.local/bin/hermes config check
+  shell: sudo -u hermes /home/hermes/.local/bin/hermes config check
   environment:
     HOME: /home/hermes
     USER: hermes

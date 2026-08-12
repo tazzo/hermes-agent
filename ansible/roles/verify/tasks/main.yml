@@ -21,10 +21,7 @@
   failed_when: dashboard_pid.stdout == ""
 
 - name: Check hermes binary version
-  shell: /home/hermes/.local/bin/hermes --version
-  become: yes
-  become_user: hermes
-  become_method: su
+  shell: sudo -u hermes /home/hermes/.local/bin/hermes --version
   environment:
     HOME: /home/hermes
     USER: hermes
@@ -39,10 +36,7 @@
   failed_when: dashboard_http.status != 200
 
 - name: Hermes config check
-  shell: /home/hermes/.local/bin/hermes config check
-  become: yes
-  become_user: hermes
-  become_method: su
+  shell: sudo -u hermes /home/hermes/.local/bin/hermes config check
   environment:
     HOME: /home/hermes
     USER: hermes

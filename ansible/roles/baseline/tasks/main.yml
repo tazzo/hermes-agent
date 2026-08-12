@@ -22,7 +22,7 @@
       - python3
       - python3-pip
       - qemu-guest-agent
-      - libasound2
+      - libasound2t64   # renamed from libasound2 (Ubuntu t64 transition)
       - libatk-bridge2.0-0
       - libatk1.0-0
       - libatspi2.0-0
@@ -118,7 +118,7 @@
   failed_when: false
 
 - name: Format /dev/vdb as ext4 (first boot only)
-  filesystem:
+  community.general.filesystem:
     fstype: ext4
     dev: /dev/vdb
   when: vdb_fstype.stdout == ""
