@@ -3,28 +3,22 @@
 # Runs as bootstrap (become: yes). Idempotent.
 # Passwords injected via env vars (BOOTSTRAP_PASSWORD, HERMES_PASSWORD)
 # exported by create.sh from gopass — never stored in files or logs.
-
-- name: Wait for dpkg/apt lock to be free (cloud-init/unattended-upgrades may hold it at first boot)
-  shell: |
-    for i in $(seq 1 60); do
-      if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
-        exit 0
-      fi
-      sleep 2
-    done
-    echo "dpkg lock still held after 120s" >&2
-    exit 1
-  changed_when: false
+#
+# Lock handling: the apt module natively waits for the dpkg lock via
+# lock_timeout (ansible-core 2.12+). cloud-init package_update may hold the
+# lock at first boot — lock_timeout: 600 waits instead of failing.
 
 - name: apt update
   apt:
     update_cache: yes
     cache_valid_time: 3600
+    lock_timeout: 600
 
 - name: apt upgrade — MANDATORY (recent Ubuntu bug wave, patch immediately)
   apt:
     upgrade: dist
     autoremove: yes
+    lock_timeout: 600
 
 - name: Install baseline packages
   apt:
@@ -68,6 +62,7 @@
       - fonts-freefont-ttf
       - e2fsprogs
     state: present
+    lock_timeout: 600
 
 - name: Enable qemu-guest-agent
   systemd:

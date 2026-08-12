@@ -62,6 +62,7 @@ Proxmox "tazlab" (192.168.1.200)
 | host key mismatch on SSH | Old key in known_hosts | `ssh-keygen -R 192.168.1.205` |
 | Ansible `become` temp file error | Ansible 2.21 bug with non-root become | Fixed: `sudo -u hermes` pattern in roles |
 | `libasound2` not found | Ubuntu 26.04 t64 rename | Use `libasound2t64` in baseline |
+| apt "Unable to acquire dpkg lock" | cloud-init package_update at first boot | Handled natively: apt `lock_timeout: 600` waits for the lock |
 
 ## Post-onboarding validation
 
