@@ -29,7 +29,7 @@ err()  { log "ERROR" "$@"; }
 trap 'rc=$?; if [ $rc -ne 0 ]; then err "create.sh failed at phase [$CURRENT_PHASE] line $LINENO (exit $rc)"; err "Re-run ./create.sh — every phase is idempotent. Full log: $LOG_FILE"; fi' ERR
 
 # Log rotation: keep last 20 create logs
-ls -t "$LOG_DIR"/create_*.log 2>/dev/null | tail -n +21 | xargs -r rm -f
+ls -t "$LOG_DIR"/create_*.log 2>/dev/null | tail -n +21 | xargs -r rm -f || true
 
 info "create.sh starting — VM 501 (hermes), IP 192.168.1.205"
 info "Log: $LOG_FILE"
@@ -55,14 +55,19 @@ export HERMES_HOST_KEY="$(gopass cat infra/ssh-host-keys/hermes-agent/ed25519 2>
 export PROXMOX_VE_API_TOKEN="$(gopass show -o bootstrap/proxmox/token-id | tr -d "'\r")=$(gopass show -o bootstrap/proxmox/token-secret | tr -d "'\r")"
 export PROXMOX_VE_INSECURE=true
 
-# ── PHASE 0: Cleanup gate — IP must be free ────────────────────────────────
+# ── PHASE 0: Cleanup gate — IP conflict check ──────────────────────────────
 CURRENT_PHASE="phase0-cleanup-gate"
-info "Phase 0/8 — cleanup gate (IP $IP_ADDRESS must be free)"
-if ping -c1 -W1 "$IP_ADDRESS" >/dev/null 2>&1; then
-  err "IP $IP_ADDRESS responds — old CT/VM still alive? Destroy it first (Iteration 0). Aborting."
+info "Phase 0/8 — cleanup gate (IP $IP_ADDRESS conflict check)"
+# Real conflict: IP responds AND our VM doesn't exist (e.g. old CT resurrected).
+# If VM 501 exists, it legitimately owns .205 — proceed (idempotent re-run).
+if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "root@$PROXMOX_HOST" "qm status $VM_ID" >/dev/null 2>&1; then
+  info "Phase 0/8 — VM $VM_ID exists (idempotent re-run) ... OK"
+elif ping -c1 -W1 "$IP_ADDRESS" >/dev/null 2>&1; then
+  err "IP $IP_ADDRESS responds but VM $VM_ID does not exist — foreign host on our IP? Aborting."
   exit 1
+else
+  info "Phase 0/8 — VM absent, IP free ... OK"
 fi
-info "Phase 0/8 — IP $IP_ADDRESS free ... OK"
 
 # ── PHASE 1: Pre-flight — cloud image, data disk, gopass ──────────────────
 CURRENT_PHASE="phase1-preflight"

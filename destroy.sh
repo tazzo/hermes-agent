@@ -25,7 +25,7 @@ err()  { log "ERROR" "$@"; }
 
 trap 'rc=$?; if [ $rc -ne 0 ]; then err "destroy.sh failed at phase [$CURRENT_PHASE] line $LINENO (exit $rc)"; err "Full log: $LOG_FILE"; fi' ERR
 
-ls -t "$LOG_DIR"/destroy_*.log 2>/dev/null | tail -n +21 | xargs -r rm -f
+ls -t "$LOG_DIR"/destroy_*.log 2>/dev/null | tail -n +21 | xargs -r rm -f || true
 
 source "$SCRIPT_DIR/configs/runtime.env"
 PROXMOX_HOST="${PROXMOX_HOST:-192.168.1.200}"

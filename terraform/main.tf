@@ -23,10 +23,15 @@ resource "proxmox_virtual_environment_vm" "hermes" {
   # (vm-<VMID>-disk-1, attached outside Terraform via qm set) on destroy.
   delete_unreferenced_disks_on_destroy = false
 
-  # NOTE: agent.enabled intentionally NOT set. The provider waits for the
-  # qemu-guest-agent to report IPs after boot; cloud images don't ship it,
-  # which stalls apply for minutes. IP is static via cloud-init; the agent
-  # is installed by Ansible baseline instead.
+  # QEMU agent: enabled creates the virtio-serial channel (guest agent works).
+  # wait_for_ip.disabled: IP is static via cloud-init — skip the agent IP lookup,
+  # otherwise apply blocks up to 15m waiting for an agent that cloud images lack.
+  agent {
+    enabled = true
+    wait_for_ip {
+      disabled = true
+    }
+  }
 
   efi_disk {
     datastore_id = var.storage_pool
