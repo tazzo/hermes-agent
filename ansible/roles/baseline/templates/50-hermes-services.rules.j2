@@ -1,11 +1,15 @@
-// Allow user hermes to manage ONLY her own systemd services (gateway + dashboard).
-// Enterprise: scoped polkit rule — no sudo, no root. Hermes can restart its own
-// services in safety; everything else still requires authentication.
+// Allow user hermes to manage ONLY her own systemd services.
+// - hermes-gateway.service / hermes-dashboard.service: direct management
+// - hermes-restart.service: oneshot helper that restarts both services as root
+//   (so Hermes can restart itself without dying mid-command).
+// Enterprise: scoped polkit rule — no sudo, no root. Everything else still
+// requires authentication.
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
         subject.user == "hermes" &&
         (action.lookup("unit") == "hermes-gateway.service" ||
-         action.lookup("unit") == "hermes-dashboard.service")) {
+         action.lookup("unit") == "hermes-dashboard.service" ||
+         action.lookup("unit") == "hermes-restart.service")) {
         return polkit.Result.YES;
     }
 });

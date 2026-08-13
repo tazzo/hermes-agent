@@ -1,0 +1,13 @@
+[Unit]
+Description=Hermes Self-Restart (gateway + dashboard)
+# Runs as root via systemd (not as hermes): survives the gateway shutdown,
+# so Hermes can restart itself without dying mid-command.
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart hermes-gateway.service hermes-dashboard.service
+TimeoutStartSec=90
+
+[Install]
+WantedBy=multi-user.target
