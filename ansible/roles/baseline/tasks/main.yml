@@ -161,3 +161,29 @@
     group: hermes
     mode: '0755'
     state: directory
+
+# ── Ownership fix: caches/playwright may end up root-owned (created during
+# first-boot install while /home/hermes mount context differed). Hermes needs
+# write access to its own caches. lost+found is intentionally left root-owned
+# (ext4 artifact on the data disk).
+- name: Fix ownership of Hermes caches (root → hermes, idempotent)
+  file:
+    path: "{{ item }}"
+    owner: hermes
+    group: hermes
+    recurse: yes
+    state: directory
+  loop:
+    - /home/hermes/.cache
+    - /home/hermes/.npm
+
+# ── Enterprise self-restart: scoped polkit rule so Hermes can restart its own
+# systemd services WITHOUT sudo/root. Verified: restart allowed for
+# hermes-gateway/hermes-dashboard only; sshd still denied (2026-08-13).
+- name: Deploy polkit rule for Hermes self-service restart
+  template:
+    src: 50-hermes-services.rules.j2
+    dest: /etc/polkit-1/rules.d/50-hermes-services.rules
+    owner: root
+    group: root
+    mode: '0644'
