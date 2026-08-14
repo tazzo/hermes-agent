@@ -1,12 +1,19 @@
-// Allow user 'hermes' to manage ONLY the hermes-gateway.service unit
-// (start/stop/restart/reload) without a password. Least-privilege:
-// every other systemd operation still requires root.
+// Allow user 'hermes' to start the hermes-restart.service oneshot unit
+// (which restarts gateway + dashboard as root) plus manage the gateway
+// unit directly. Least-privilege: every other systemd op still needs root.
+// NOTE: `hermes gateway restart` CLI has a hardcoded root guard in the
+// binary (SystemScopeRequiresRootError) — polkit does NOT bypass it.
+// The working self-restart path is: systemctl start hermes-restart.service
 polkit.addRule(function (action, subject) {
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
-        subject.user == "hermes" &&
-        action.lookup("unit") == "hermes-gateway.service") {
+        subject.user == "hermes") {
+        var unit = action.lookup("unit");
         var verb = action.lookup("verb");
-        if (["start", "stop", "restart", "reload"].indexOf(verb) >= 0) {
+        if (unit == "hermes-restart.service" && verb == "start") {
+            return polkit.Result.YES;
+        }
+        if (unit == "hermes-gateway.service" &&
+            ["start", "stop", "restart", "reload"].indexOf(verb) >= 0) {
             return polkit.Result.YES;
         }
     }
