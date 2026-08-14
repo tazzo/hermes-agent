@@ -1,0 +1,13 @@
+// Allow user 'hermes' to manage ONLY the hermes-gateway.service unit
+// (start/stop/restart/reload) without a password. Least-privilege:
+// every other systemd operation still requires root.
+polkit.addRule(function (action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "hermes" &&
+        action.lookup("unit") == "hermes-gateway.service") {
+        var verb = action.lookup("verb");
+        if (["start", "stop", "restart", "reload"].indexOf(verb) >= 0) {
+            return polkit.Result.YES;
+        }
+    }
+});
