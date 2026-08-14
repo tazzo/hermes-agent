@@ -78,16 +78,10 @@
 
 # auth.json (OAuth creds from dashboard onboarding) is NEVER touched by Ansible.
 
-# Polkit rule: allow user 'hermes' to manage ONLY hermes-gateway.service
-# (start/stop/restart/reload) without sudo. Least-privilege gateway
-# self-restart for the operator/agent; all other systemd ops still need root.
-- name: Deploy polkit rule for hermes-gateway self-restart
-  copy:
-    src: 50-hermes-gateway.rules
-    dest: /etc/polkit-1/rules.d/50-hermes-gateway.rules
-    owner: root
-    group: root
-    mode: '0644'
+# NOTE: polkit rule for Hermes self-restart lives in the BASELINE role
+# (50-hermes-services.rules — covers gateway + dashboard + hermes-restart unit).
+# A duplicate rule deployed here (50-hermes-gateway.rules) was removed 2026-08-14
+# to avoid two overlapping rules.
 
 - name: Run hermes config check (safe every run)
   shell: sudo -u hermes /home/hermes/.local/bin/hermes config check
