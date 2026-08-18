@@ -122,17 +122,11 @@
     mode: '0644'
 
 - name: Reload user systemd daemon
-  become: yes
-  become_user: hermes
-  become_method: sudo
-  command: systemctl --user daemon-reload
+  command: sudo -u hermes systemctl --user daemon-reload
   changed_when: false
 
 - name: Enable and start hermes-research (user unit)
-  become: yes
-  become_user: hermes
-  become_method: sudo
-  command: systemctl --user enable --now hermes-research.service
+  command: sudo -u hermes systemctl --user enable --now hermes-research.service
   changed_when: false
 
 - name: Run hermes config check (safe every run)
