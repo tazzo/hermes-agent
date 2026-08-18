@@ -122,11 +122,11 @@
     mode: '0644'
 
 - name: Reload user systemd daemon
-  command: sudo -u hermes systemctl --user daemon-reload
+  command: sudo -u hermes XDG_RUNTIME_DIR=/run/user/10000 systemctl --user daemon-reload
   changed_when: false
 
 - name: Enable and start hermes-research (user unit)
-  command: sudo -u hermes systemctl --user enable --now hermes-research.service
+  command: sudo -u hermes XDG_RUNTIME_DIR=/run/user/10000 systemctl --user enable --now hermes-research.service
   changed_when: false
 
 - name: Run hermes config check (safe every run)
