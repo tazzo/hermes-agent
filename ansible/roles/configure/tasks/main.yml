@@ -129,6 +129,26 @@
   command: sudo -u hermes XDG_RUNTIME_DIR=/run/user/10000 systemctl --user enable --now hermes-research.service
   changed_when: false
 
+# ── Headless Chrome durevole (CDP 9222, Playwright connect_over_cdp) ────────
+# Browser served as user unit: survives gateway restarts, single instance.
+# Hermes must NOT spawn its own browser — connect via CDP only.
+
+- name: Deploy hermes-chrome user unit
+  template:
+    src: hermes-chrome.service.j2
+    dest: /home/hermes/.config/systemd/user/hermes-chrome.service
+    owner: hermes
+    group: hermes
+    mode: '0644'
+
+- name: Reload user systemd daemon (chrome)
+  command: sudo -u hermes XDG_RUNTIME_DIR=/run/user/10000 systemctl --user daemon-reload
+  changed_when: false
+
+- name: Enable and start hermes-chrome (user unit)
+  command: sudo -u hermes XDG_RUNTIME_DIR=/run/user/10000 systemctl --user enable --now hermes-chrome.service
+  changed_when: false
+
 - name: Run hermes config check (safe every run)
   shell: sudo -u hermes /home/hermes/.local/bin/hermes config check
   environment:

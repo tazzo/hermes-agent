@@ -1,0 +1,21 @@
+# Hermes Headless Chrome — durevole via systemd USER (no root, no manual start)
+# Serves CDP on 127.0.0.1:9222 for Playwright connect_over_cdp.
+# NOTE: --no-sandbox is Playwright's standard on Linux (no setuid helper) —
+# accepted tradeoff for browser automation; Hermes connects via CDP, never
+# spawns its own browser (single instance, no port conflict).
+[Unit]
+Description=Hermes Headless Chrome (CDP 9222)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/hermes/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome --headless=new --no-sandbox --disable-gpu --remote-debugging-port=9222 --user-data-dir=/home/hermes/.browser-profile --no-first-run --disable-dev-shm-usage about:blank
+Restart=on-failure
+RestartSec=3
+
+# Basic hardening (user-unit safe)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
