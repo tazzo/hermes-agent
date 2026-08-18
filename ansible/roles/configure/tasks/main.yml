@@ -99,11 +99,11 @@
   changed_when: false
   failed_when: "'Linger=yes' not in linger_check.stdout"
 
-- name: Install Caddy (system binary; service runs as user hermes)
-  apt:
-    name: caddy
-    state: present
-    lock_timeout: 600
+- name: Verify Caddy binary exists (user-installed at ~/.local/bin/caddy)
+  stat:
+    path: /home/hermes/.local/bin/caddy
+  register: caddy_bin
+  failed_when: not caddy_bin.stat.exists
 
 - name: Ensure user systemd unit directory exists
   file:
