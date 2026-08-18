@@ -1,0 +1,20 @@
+# Hermes Research Results — Caddy publishing server (USER space)
+# Runs as user hermes via systemd --user (no root, no sudo in lifecycle).
+# Serves ~/research-site/public on :8080 (VPN-only, no public domain).
+[Unit]
+Description=Hermes Research Results (Caddy static publisher)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/caddy run --config /home/hermes/research-site/Caddyfile --adapter caddyfile
+Restart=on-failure
+RestartSec=3
+
+# Basic hardening (user-unit safe: no ProtectHome — Caddy writes data to
+# ~/.local/share/caddy and ~/.config/caddy)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

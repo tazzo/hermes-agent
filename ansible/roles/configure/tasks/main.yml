@@ -83,6 +83,58 @@
 # A duplicate rule deployed here (50-hermes-gateway.rules) was removed 2026-08-14
 # to avoid two overlapping rules.
 
+# ── Caddy research publisher (user space, no root in lifecycle) ────────────
+# Hermes publishes web-search results on :8080 (VPN-only) via a systemd USER
+# unit. User units are managed by hermes with systemctl --user — no polkit
+# rule needed (user units don't require it) and no sudo.
+
+- name: Enable linger for hermes (user manager survives logout, starts at boot)
+  command: loginctl enable-linger hermes
+  changed_when: false
+  register: linger_result
+
+- name: Verify linger is enabled
+  command: loginctl show-user hermes -p Linger
+  register: linger_check
+  changed_when: false
+  failed_when: "'Linger=yes' not in linger_check.stdout"
+
+- name: Install Caddy (system binary; service runs as user hermes)
+  apt:
+    name: caddy
+    state: present
+    lock_timeout: 600
+
+- name: Ensure user systemd unit directory exists
+  file:
+    path: /home/hermes/.config/systemd/user
+    state: directory
+    owner: hermes
+    group: hermes
+    mode: '0755'
+
+- name: Deploy hermes-research user unit
+  template:
+    src: hermes-research.service.j2
+    dest: /home/hermes/.config/systemd/user/hermes-research.service
+    owner: hermes
+    group: hermes
+    mode: '0644'
+
+- name: Reload user systemd daemon
+  become: yes
+  become_user: hermes
+  become_method: sudo
+  command: systemctl --user daemon-reload
+  changed_when: false
+
+- name: Enable and start hermes-research (user unit)
+  become: yes
+  become_user: hermes
+  become_method: sudo
+  command: systemctl --user enable --now hermes-research.service
+  changed_when: false
+
 - name: Run hermes config check (safe every run)
   shell: sudo -u hermes /home/hermes/.local/bin/hermes config check
   environment:
