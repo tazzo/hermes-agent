@@ -163,7 +163,7 @@
 - name: Create Samba credentials file (from gopass env, no_log)
   copy:
     content: |
-      username=storage
+      username={{ lookup('env', 'SAMBA_USERNAME') }}
       password={{ lookup('env', 'SAMBA_PASSWORD') }}
     dest: /etc/cifs-credentials-hermes
     owner: root
