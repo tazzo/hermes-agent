@@ -149,6 +149,48 @@
   command: sudo -u hermes XDG_RUNTIME_DIR=/run/user/10000 systemctl --user enable --now hermes-chrome.service
   changed_when: false
 
+# ── Samba shared mount (/mnt/shared from CT 107 lxc-storage) ───────────────
+# Hermes can read+write the whole share; ~hermes/ subdir as convention.
+# Credentials come from gopass at playbook run, written to a protected file
+# (mode 0600) — NEVER inline in fstab.
+
+- name: Install cifs-utils
+  apt:
+    name: cifs-utils
+    state: present
+    lock_timeout: 600
+
+- name: Create Samba credentials file (from gopass env, no_log)
+  copy:
+    content: |
+      username=storage
+      password={{ lookup('env', 'SAMBA_PASSWORD') }}
+    dest: /etc/cifs-credentials-hermes
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Create /mnt/shared mount point
+  file:
+    path: /mnt/shared
+    state: directory
+    mode: '0755'
+
+- name: Add Samba share to /etc/fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "//192.168.1.207/shared /mnt/shared cifs credentials=/etc/cifs-credentials-hermes,uid=10000,gid=10000,file_mode=0770,dir_mode=0770,_netdev,x-systemd.automount 0 0"
+    create: yes
+
+- name: Mount /mnt/shared
+  mount:
+    path: /mnt/shared
+    src: //192.168.1.207/shared
+    fstype: cifs
+    opts: credentials=/etc/cifs-credentials-hermes,uid=10000,gid=10000,file_mode=0770,dir_mode=0770,_netdev,x-systemd.automount
+    state: mounted
+
 - name: Run hermes config check (safe every run)
   shell: sudo -u hermes /home/hermes/.local/bin/hermes config check
   environment:
